@@ -112,6 +112,7 @@ class App:
     self._output = None
     self._result = None
     self._ticks = 0
+    self._reset()
     self._refresh_devices()
 
   def _create_layout(self):
@@ -153,6 +154,7 @@ class App:
     self._button.grid(row=0, column=1)
 
   def _reset(self):
+    self._button.config(state='normal')
     self._shredding = False
     self._output = None
     self._result = None
@@ -234,7 +236,7 @@ class App:
 
     # Extract the file.
     try:
-      device = re.search(r'(/dev/\S+) - ', device).group(1)
+      device = re.search(r'^(/\S+)', device).group(1)
     except:
       self._append_log('No device specified.')
       return
@@ -251,6 +253,7 @@ class App:
     pool = multiprocessing.Pool()
     self._append_log('Shredding..')
     self._result, self._manager, self._output = Shred.launch(pool, shred)
+    self._button.config(state='disabled')
     self._shredding = True
     
   def _get_devices(self):
