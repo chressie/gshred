@@ -18,8 +18,7 @@ class ShredException(Exception):
 class Shred:
 
   EXE = '/usr/bin/shred'
-  SUCCESS = '[SUCCESS]'
-  FAILURE = '[FAILURE]'
+  TERMINATED = '[TERMINATED]'
 
   def __init__(self):
     self._exact = True
@@ -61,23 +60,53 @@ class Shred:
                             stderr=subprocess.PIPE,
                             bufsize=0)
  
-    # Get the verbose logging output.
+    # Get the verbose logging output (it's coming from stderr).
     while True:
-      line = proc.stdout.readline()
+      line = proc.stderr.readline()
       if not line:
         break
-      output.put(line.strip())
+      output.put(line)
     
     # Notify termination status.
-    if proc.returncode == 0:
-      output.put(Shred.SUCCESS)
-    else:
-      output.put(Shred.FAILURE)
+    proc.wait()
+    output.put('%s %d' % (Shred.TERMINATED, proc.returncode)) 
 
+  @staticmethod
+  def launch(pool, shred):
+    manager = multiprocessing.Manager()
+    output = manager.Queue()
+    return pool.apply_async(shred, (output,)), manager, output
 
 def main():
   shred = Shred().exact().path('/home/user/dev/gshred/testfile')
-  shred()
+  pool = multiprocessing.Pool()
+  result, manager, output = Shred.launch(pool, shred)
+  timeouts = 0
+
+  # Grab 
+  while True:
+    if timeouts > 3:
+      print('Timed out')
+      break
+    try:
+      # Only attempt this a couple of times before we give up.
+      line = output.get(block=True, timeout=10.0).strip()
+    except:
+      timeouts += 1
+      continue
+
+    # We got an update, everything seems fine. Reset timeouts count.
+    timeouts = 0
+    if not line.startswith(Shred.TERMINATED):
+      print(line)
+    else:
+      code = int(re.search(r'] (\d+)', line).group(1))
+      print('Exit code: %d' % code)
+      break
+
+    if result.ready():
+      print('Done')
+      break
 
 if __name__ == '__main__':
   main()
