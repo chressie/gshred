@@ -33,6 +33,11 @@ class Shred:
     self._path = value
     return self
 
+  def iterations(self, value):
+    if value > 0 and value < 10:
+      self._iterations = value
+    return self
+
   def __call__(self, output):
     # Make sure that the path exists.
     if not self._path or not os.path.exists(self._path):
@@ -82,8 +87,8 @@ class App:
   def __init__(self):
     self._root = tk.Tk()
     self._create_layout()
-    self._log.insert(tk.END, "HELLO")
     self._device = None
+    self._shredding = False
 
   def _create_layout(self):
     # Configure root element.
@@ -114,7 +119,7 @@ class App:
 
     # Create dropdown list of all devices (will be populated later).
     self._text = tk.StringVar(self._menuframe, "Chose device")
-    devs = ('hello', 'world', '/dev/sdb')
+    devs = ('/home/user/dev/gshred/testfile',)
     self._devices = tk.OptionMenu(self._menuframe, self._text, 
                                  *devs, command=self._selection)
     self._devices.grid(row=0, column=0, sticky='we')
@@ -124,64 +129,88 @@ class App:
                              command=self._shred)
     self._button.grid(row=0, column=1)
 
+  def _do_pulse(self):
+    pass
+
   def _pulse(self):
-    print('Pulse..')
+    try:
+      self._do_pulse()
+    except:
+      pass
+
+    # Reschedule pulsing callback.
     self._root.after(App.PULSE_PERIOD, self._pulse)
 
   def _selection(self, value):
     self._device = value
-    print(self._device)
 
   def _shred(self):
-    # Grab the device to be shredded.
-    print('Shred!')
+    try:
+      self._do_shred()
+    except:
+      msg = traceback.format_exc()
+      self._log.insert(tk.END, msg)
+
+    self._shredding = False
+
+  def _do_shred(self):
+    # Already in progress.
+    if self._shredding:
+      return
+
+    # No device specified.
+    if not self._device:
+      return
+
+    # Device does not seem to exist.
+    device = os.path.normpath(os.path.abspath(self._device))
+    if not os.path.exists(device):
+      return
+    
+    # Build the shredder.
+    shred = Shred().iterations(1).exact(True).path(device)
+    pool = multiprocessing.Pool()
+    self._shredding = True
+    result, manager, output = Shred.launch(pool, shred)
+    timeouts = 0
+
+    # Grab output.
+    while True:
+      if timeouts >= 3:
+        self._log.insert(tk.END, 'Failure: process timed out.')
+        break
+
+      try:
+        # Only attempt this a couple of times before we give up.
+        line = output.get(block=True, timeout=10.0).strip()
+      except:
+        timeouts += 1
+        continue
+
+      # We got an update, everything seems fine. Reset timeouts count.
+      timeouts = 0
+      if not line.startswith(Shred.TERMINATED):
+        self._log.insert(tk.END, line)
+      else:
+        code = int(re.search(r'] (\d+)', line).group(1))
+        if code == 0:
+          self._log.insert(tk.END, 'Completed successfully!')
+        else:
+          self._log.insert(tk.END, 'Failure.')
+
+        # Process finished.
+        break
 
   def _refresh_devices(self):
     pass
     
-
   def run(self):
     self._root.after(App.PULSE_PERIOD, self._pulse)
     tk.mainloop()
-    
-
-
 
 def main():
   app = App()
   app.run()
-
-
-  return
-  shred = Shred().exact().path('/home/user/dev/gshred/testfile')
-  pool = multiprocessing.Pool()
-  result, manager, output = Shred.launch(pool, shred)
-  timeouts = 0
-
-  # Grab 
-  while True:
-    if timeouts > 3:
-      print('Timed out')
-      break
-    try:
-      # Only attempt this a couple of times before we give up.
-      line = output.get(block=True, timeout=10.0).strip()
-    except:
-      timeouts += 1
-      continue
-
-    # We got an update, everything seems fine. Reset timeouts count.
-    timeouts = 0
-    if not line.startswith(Shred.TERMINATED):
-      print(line)
-    else:
-      code = int(re.search(r'] (\d+)', line).group(1))
-      print('Exit code: %d' % code)
-      break
-
-    if result.ready():
-      print('Done')
-      break
 
 if __name__ == '__main__':
   main()
