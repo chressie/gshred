@@ -90,6 +90,7 @@ class App:
     self._shredding = False
     self._output = None
     self._result = None
+    self._ticks = 0
 
   def _create_layout(self):
     # Configure root element.
@@ -135,7 +136,6 @@ class App:
     self._output = None
     self._result = None
     self._ticks = 0
-    
   
   def _do_pulse(self): 
     if not self._shredding or not self._output or not self._result:
@@ -148,8 +148,8 @@ class App:
     except:
       # Nothing in the queue.
       if self._result.ready():
-        # Are we done?
-        self._log_message('Done!')
+        # We are done.
+        self._append_log('Done!')
         self._reset()
         return
       else:
@@ -160,16 +160,22 @@ class App:
 
     # We have a new message.
     if line.startswith(Shred.TERMINATED):
-      self._log_message('Done!')
+      code = int(re.search(r'] (\d+)', line).group(1))
+      if code == 0:
+        self._append_log('Completed successfully!')
+      else:
+        self._append_log('Failure.')
       self._reset()
     else:
-      self._log_message(line)
+      self._append_log(line)
 
   def _pulse(self):
     try:
       self._do_pulse()
     except:
-      pass
+      # Clear log.
+      self._log.delete('1.0', tk.END)
+      self._append_log(traceback.format_exc())
 
     # Reschedule pulsing callback.
     self._root.after(App.PULSE_PERIOD, self._pulse)
@@ -186,8 +192,6 @@ class App:
     except:
       msg = traceback.format_exc()
       self._append_log(msg)
-
-    self._shredding = False
 
   def _do_shred(self):
     # Already in progress.
@@ -211,36 +215,8 @@ class App:
     # Build the shredder.
     shred = Shred().iterations(1).exact(True).path(device)
     pool = multiprocessing.Pool()
-    self._shredding = True
     self._result, self._manager, self._output = Shred.launch(pool, shred)
-    timeouts = 0
-
-    # Grab output.
-    while True:
-      if timeouts >= 3:
-        self._append_log('Failure: process timed out.')
-        break
-
-      try:
-        # Only attempt this a couple of times before we give up.
-        line = output.get(block=True, timeout=10.0).strip()
-      except:
-        timeouts += 1
-        continue
-
-      # We got an update, everything seems fine. Reset timeouts count.
-      timeouts = 0
-      if not line.startswith(Shred.TERMINATED):
-        self._append_log(line)
-      else:
-        code = int(re.search(r'] (\d+)', line).group(1))
-        if code == 0:
-          self._append_log('Completed successfully!')
-        else:
-          self._append_log('Failure.')
-
-        # Process finished.
-        break
+    self._shredding = True
 
   def _refresh_devices(self):
     pass
