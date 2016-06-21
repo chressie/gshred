@@ -77,7 +77,31 @@ class Shred:
     output = manager.Queue()
     return pool.apply_async(shred, (output,)), manager, output
 
+class UI:
+
+  def __init__(self):
+    self._root = Tkinter.Tk()
+    self._create_layout()
+    self._log.insert(Tkinter.END, "HELLO")
+    Tkinter.mainloop()
+
+  def _create_layout(self):
+    self._log = Tkinter.Text(self._root, height=4, width=80)
+    self._scroll = Tkinter.Scrollbar(self._root)
+    self._scroll.pack(side=Tkinter.RIGHT, fill=Tkinter.Y)
+    self._log.pack(side=Tkinter.LEFT, fill=Tkinter.Y)
+    self._scroll.config(command=self._log.yview)
+    self._log.config(yscrollcommand=self._scroll.set)
+    
+
+
+
 def main():
+  ui = UI()
+
+
+
+  return
   shred = Shred().exact().path('/home/user/dev/gshred/testfile')
   pool = multiprocessing.Pool()
   result, manager, output = Shred.launch(pool, shred)
