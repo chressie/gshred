@@ -80,6 +80,7 @@ class Shred:
 class App:
 
   PULSE_PERIOD = 500
+  SAFE_PATH = '/lib/live/mount/'
 
   def __init__(self):
     self._root = tk.Tk()
@@ -230,7 +231,7 @@ class App:
     self._devices['menu'].delete(0, 'end') 
 
     # Grab devices.
-    output = subprocess.check_output(shlex.split('lsblk -f -l -p'))
+    output = subprocess.check_output(shlex.split('lsblk -l -p'))
     pattern = re.compile(r'^(/dev/\S+?)\s+')
 
     # Add dummy file.
@@ -244,10 +245,15 @@ class App:
 
     # Add new ones to the list.
     for line in output.split('\n')[1:]:
+      if App.SAFE_PATH in line:
+        # Do not show the live media partitions. :-)
+        continue
+
       m = pattern.search(line)
       if not m:
         continue
-      device = m.groups()
+
+      device = m.group(1)
       self._devices['menu'].add_command(label=device,
                                         command=tk._setit(self._text, device))
     
