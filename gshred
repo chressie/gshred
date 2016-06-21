@@ -1,3 +1,29 @@
 #!/usr/bin/env python
 
+import re
+import os
+import sys
+import string
+import subprocess
+import multiprocess
 
+import Tkinter
+
+
+class Shred:
+
+  def __init__(self):
+    pass
+
+  def exact(self, value=True):
+    self._exact = value
+    return self
+
+  def path(self, value):
+    self._path = value
+    return self
+
+  def __call__(self):
+    # TODO: Launch in a new thread to make sure UI stays responsive.
+    # or: multiprocessing for GIL sanity.
+    pass
