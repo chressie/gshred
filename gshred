@@ -8,7 +8,6 @@ import string
 import traceback
 import subprocess
 import multiprocessing
-
 import Tkinter as tk
 
 
@@ -84,6 +83,7 @@ class App:
     self._root = tk.Tk()
     self._create_layout()
     self._log.insert(tk.END, "HELLO")
+    self._device = None
 
   def _create_layout(self):
     # Configure root element.
@@ -113,9 +113,10 @@ class App:
     self._log.bind("<Key>", lambda e: "break")
 
     # Create dropdown list of all devices (will be populated later).
-    var = tk.StringVar(self._menuframe, "Chose device")
+    self._text = tk.StringVar(self._menuframe, "Chose device")
     devs = ('hello', 'world', '/dev/sdb')
-    self._devices = tk.OptionMenu(self._menuframe, var, *devs)
+    self._devices = tk.OptionMenu(self._menuframe, self._text, 
+                                 *devs, command=self._selection)
     self._devices.grid(row=0, column=0, sticky='we')
 
     # Create shred button.
@@ -127,7 +128,12 @@ class App:
     print('Pulse..')
     self._root.after(App.PULSE_PERIOD, self._pulse)
 
+  def _selection(self, value):
+    self._device = value
+    print(self._device)
+
   def _shred(self):
+    # Grab the device to be shredded.
     print('Shred!')
 
   def _refresh_devices(self):
