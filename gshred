@@ -52,10 +52,9 @@ class Shred:
       command += ' --exact'
     if output:
       command += ' --verbose'
-    command += ' %s' % self._path
+    command += ' "%s"' % self._path
 
     # Launch shred.
-    print('Command: %s' % command)
     proc = subprocess.Popen(shlex.split(command),
                             shell=False,
                             stdin=subprocess.PIPE,
@@ -89,6 +88,8 @@ class App:
     self._create_layout()
     self._device = None
     self._shredding = False
+    self._output = None
+    self._result = None
 
   def _create_layout(self):
     # Configure root element.
@@ -129,8 +130,40 @@ class App:
                              command=self._shred)
     self._button.grid(row=0, column=1)
 
-  def _do_pulse(self):
-    pass
+  def _reset(self):
+    self._shredding = False
+    self._output = None
+    self._result = None
+    self._ticks = 0
+    
+  
+  def _do_pulse(self): 
+    if not self._shredding or not self._output or not self._result:
+      # Nothing to do.
+      return
+
+    # Check if we have something to read out.
+    try:
+      line = self._output.get(block=False)
+    except:
+      # Nothing in the queue.
+      if self._result.ready():
+        # Are we done?
+        self._log_message('Done!')
+        self._reset()
+        return
+      else:
+        # Not done yet, but there is also nothing in the queue.
+        # We have to wait a bit.
+        self._ticks += 1
+        return
+
+    # We have a new message.
+    if line.startswith(Shred.TERMINATED):
+      self._log_message('Done!')
+      self._reset()
+    else:
+      self._log_message(line)
 
   def _pulse(self):
     try:
@@ -144,12 +177,15 @@ class App:
   def _selection(self, value):
     self._device = value
 
+  def _append_log(self, line):
+    self._log.insert(tk.INSERT, line + '\n')
+
   def _shred(self):
     try:
       self._do_shred()
     except:
       msg = traceback.format_exc()
-      self._log.insert(tk.END, msg)
+      self._append_log(msg)
 
     self._shredding = False
 
@@ -158,26 +194,31 @@ class App:
     if self._shredding:
       return
 
+    # Clear log.
+    self._log.delete('1.0', tk.END)
+
     # No device specified.
     if not self._device:
+      self._append_log('No device specified.')
       return
 
     # Device does not seem to exist.
     device = os.path.normpath(os.path.abspath(self._device))
     if not os.path.exists(device):
+      self._append_log('Device or file "%s" does not exist.' % device)
       return
     
     # Build the shredder.
     shred = Shred().iterations(1).exact(True).path(device)
     pool = multiprocessing.Pool()
     self._shredding = True
-    result, manager, output = Shred.launch(pool, shred)
+    self._result, self._manager, self._output = Shred.launch(pool, shred)
     timeouts = 0
 
     # Grab output.
     while True:
       if timeouts >= 3:
-        self._log.insert(tk.END, 'Failure: process timed out.')
+        self._append_log('Failure: process timed out.')
         break
 
       try:
@@ -190,13 +231,13 @@ class App:
       # We got an update, everything seems fine. Reset timeouts count.
       timeouts = 0
       if not line.startswith(Shred.TERMINATED):
-        self._log.insert(tk.END, line)
+        self._append_log(line)
       else:
         code = int(re.search(r'] (\d+)', line).group(1))
         if code == 0:
-          self._log.insert(tk.END, 'Completed successfully!')
+          self._append_log('Completed successfully!')
         else:
-          self._log.insert(tk.END, 'Failure.')
+          self._append_log('Failure.')
 
         # Process finished.
         break
