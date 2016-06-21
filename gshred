@@ -233,7 +233,7 @@ class App:
 
     # Grab devices.
     output = subprocess.check_output(shlex.split('lsblk -f -l -p'))
-    pattern = re.compile(r'^(/dev/\S+?)\s+?(\S+?)?$')
+    pattern = re.compile(r'^(/dev/\S+?)\s+')
 
     # Add dummy file.
     # TODO: Remove after testing.
@@ -246,7 +246,7 @@ class App:
       m = pattern.search(line)
       if not m:
         continue
-      device, mountpoint = m.groups()
+      device = m.groups()
       self._devices['menu'].add_command(label=device,
                                         command=tk._setit(self._text, device))
     
