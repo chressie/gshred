@@ -227,13 +227,20 @@ class App:
     self._log.delete('1.0', tk.END)
 
     # No device specified.
-    self._device = self._text.get()
-    if not self._device or 'Select file/device' in self._device:
+    device = self._text.get()
+    if not device or 'Select file/device' in device:
+      self._append_log('No device specified.')
+      return
+
+    # Extract the file.
+    try:
+      device = re.search(r'(/dev/\S+) - ', device).group(1)
+    except:
       self._append_log('No device specified.')
       return
 
     # Device does not seem to exist.
-    device = os.path.normpath(os.path.abspath(self._device))
+    device = os.path.normpath(os.path.abspath(device))
     if not os.path.exists(device):
       self._append_log(('Device or file "%s" does not exist, or you do' +
                        ' not have access.\nTry running as root.') % device)
@@ -252,8 +259,6 @@ class App:
 
     udisk_object = system_bus.get_object(udisk, '/org/freedesktop/UDisks')
     udisk_interface = dbus.Interface(udisk_object, udisk)
-    
-      
 
     # Grab information from all devices.
     devices = list()
@@ -296,7 +301,7 @@ class App:
         # Do not show the live media partitions. :-)
         continue
       if device['size'] == '0.0 B':
-        # Don't show special things.
+        # Don't show special things that do not have a size to them.
         continue
 
       # Build label.
