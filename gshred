@@ -142,6 +142,12 @@ class App:
       # Nothing to do.
       return
 
+    if self._ticks * App.PULSE_PERIOD >= 60 * 1000:
+      # There has not been any progress (output) for one minute, abort.
+      self._reset()
+      self._append_log('Operation timed out.')
+      return
+
     # Check if we have something to read out.
     try:
       line = self._output.get(block=False)
@@ -159,6 +165,7 @@ class App:
         return
 
     # We have a new message.
+    self._ticks = 0
     if line.startswith(Shred.TERMINATED):
       code = int(re.search(r'] (\d+)', line).group(1))
       if code == 0:
