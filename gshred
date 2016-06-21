@@ -3,17 +3,27 @@
 import re
 import os
 import sys
+import shlex
 import string
+import traceback
 import subprocess
-import multiprocess
+import multiprocessing
 
 import Tkinter
 
 
+class ShredException(Error):
+  pass
+
 class Shred:
 
+  EXE = '/usr/bin/shred'
+
   def __init__(self):
-    pass
+    self._exact = True
+    self._path = None
+    self._zero = False
+    self._iterations = 3
 
   def exact(self, value=True):
     self._exact = value
@@ -26,4 +36,28 @@ class Shred:
   def __call__(self):
     # TODO: Launch in a new thread to make sure UI stays responsive.
     # or: multiprocessing for GIL sanity.
-    pass
+    # Build command line.
+
+    # Make sure that the path exists.
+    if not self._path or not os.path.exists(self._path):
+      raise ShredException('Could not find path "%s".' % self._path)
+
+    command = '%s --verbose --force' % Shred.EXE
+    command += ' --iterations=%d' % self._iterations
+    if self._zero:
+      command += ' --zero'
+    if self._exact:
+      command += ' --exact'
+    command += ' %s' % self._path
+    proc = subprocess.Popen(shlex.split(command), shell=True,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+
+
+def main():
+  shred = Shred().exact().path('/home/user/dev/gshred')
+  shred()
+
+if __name__ == '__main__':
+  main()
