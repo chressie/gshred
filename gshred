@@ -237,7 +237,10 @@ class App:
 
     # Add dummy file.
     # TODO: Remove after testing.
-    d = '/root/testfile'
+    d = '/root/testfile-small'
+    self._devices['menu'].add_command(label=d,
+                                      command=tk._setit(self._text, d))
+    d = '/root/testfile-big'
     self._devices['menu'].add_command(label=d,
                                       command=tk._setit(self._text, d))
 
