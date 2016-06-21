@@ -122,7 +122,7 @@ class App:
     self._log.bind("<Key>", lambda e: "break")
 
     # Create dropdown list of all devices (will be populated later).
-    self._text = tk.StringVar(self._menuframe, "Chose device")
+    self._text = tk.StringVar(self._menuframe, "Select file/device")
     self._devices = tk.OptionMenu(self._menuframe, self._text, tuple())
     self._devices.grid(row=0, column=0, sticky='we')
 
@@ -207,7 +207,7 @@ class App:
 
     # No device specified.
     self._device = self._text.get()
-    if not self._device:
+    if not self._device or 'Select file/device' in self._device:
       self._append_log('No device specified.')
       return
 
@@ -228,7 +228,7 @@ class App:
 
   def _refresh_devices(self):
     # Clear current list.
-    self._text.set('Chose device')
+    self._text.set('Select file/device')
     self._devices['menu'].delete(0, 'end') 
 
     # Grab devices.
