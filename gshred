@@ -123,9 +123,7 @@ class App:
 
     # Create dropdown list of all devices (will be populated later).
     self._text = tk.StringVar(self._menuframe, "Chose device")
-    devs = ('/home/user/dev/gshred/testfile',)
-    self._devices = tk.OptionMenu(self._menuframe, self._text, 
-                                 *devs, command=self._selection)
+    self._devices = tk.OptionMenu(self._menuframe, self._text, tuple())
     self._devices.grid(row=0, column=0, sticky='we')
 
     # Create shred button.
@@ -189,9 +187,6 @@ class App:
     # Reschedule pulsing callback.
     self._root.after(App.PULSE_PERIOD, self._pulse)
 
-  def _selection(self, value):
-    self._device = value
-
   def _append_log(self, line):
     self._log.insert(tk.INSERT, line.strip() + '\n')
 
@@ -211,6 +206,7 @@ class App:
     self._log.delete('1.0', tk.END)
 
     # No device specified.
+    self._device = self._text.get()
     if not self._device:
       self._append_log('No device specified.')
       return
@@ -218,7 +214,8 @@ class App:
     # Device does not seem to exist.
     device = os.path.normpath(os.path.abspath(self._device))
     if not os.path.exists(device):
-      self._append_log('Device or file "%s" does not exist.' % device)
+      self._append_log(('Device or file "%s" does not exist, or you do' +
+                       ' not have access.\nTry running as root.') % device)
       return
     
     # Build the shredder.
