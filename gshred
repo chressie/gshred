@@ -12,12 +12,14 @@ import multiprocessing
 import Tkinter
 
 
-class ShredException(Error):
+class ShredException(Exception):
   pass
 
 class Shred:
 
   EXE = '/usr/bin/shred'
+  SUCCESS = '[SUCCESS]'
+  FAILURE = '[FAILURE]'
 
   def __init__(self):
     self._exact = True
@@ -33,31 +35,50 @@ class Shred:
     self._path = value
     return self
 
-  def __call__(self):
-    # TODO: Launch in a new thread to make sure UI stays responsive.
-    # or: multiprocessing for GIL sanity.
-    # Build command line.
-
+  def __call__(self, output):
+    assert output
     # Make sure that the path exists.
     if not self._path or not os.path.exists(self._path):
       raise ShredException('Could not find path "%s".' % self._path)
 
-    command = '%s --verbose --force' % Shred.EXE
+    # Build command line.
+    command = '%s --force' % Shred.EXE
     command += ' --iterations=%d' % self._iterations
     if self._zero:
       command += ' --zero'
     if self._exact:
       command += ' --exact'
+    if output:
+      command += ' --verbose'
     command += ' %s' % self._path
-    proc = subprocess.Popen(shlex.split(command), shell=True,
+
+    # Launch shred.
+    print('Command: %s' % command)
+    proc = subprocess.Popen(shlex.split(command),
+                            shell=False,
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE)
+                            stderr=subprocess.PIPE,
+                            bufsize=0)
+ 
+    # Get the verbose logging output.
+    while True:
+      line = proc.stdout.readline()
+      if not line:
+        break
+      output.put(line.strip())
+    
+    # Notify termination status.
+    if proc.returncode == 0:
+      output.put(Shred.SUCCESS)
+    else:
+      output.put(Shred.FAILURE)
 
 
 def main():
-  shred = Shred().exact().path('/home/user/dev/gshred')
+  shred = Shred().exact().path('/home/user/dev/gshred/testfile')
   shred()
 
 if __name__ == '__main__':
   main()
+
