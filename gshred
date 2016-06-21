@@ -284,7 +284,6 @@ class App:
 
   def _refresh_devices(self):
     # Clear current list.
-    self._get_devices()
     self._text.set('Select file/device')
     self._devices['menu'].delete(0, 'end') 
 
@@ -303,8 +302,9 @@ class App:
       if App.SAFE_PATH in device['mount']:
         # Do not show the live media partitions. :-)
         continue
+
       if device['size'] == '0.0 B':
-        # Don't show special things that do not have a size to them.
+        # Do not show special things that do not have a size to them.
         continue
 
       # Build label.
