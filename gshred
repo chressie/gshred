@@ -77,13 +77,14 @@ class Shred:
     output = manager.Queue()
     return pool.apply_async(shred, (output,)), manager, output
 
-class UI:
+class App:
+
+  PULSE_PERIOD = 500
 
   def __init__(self):
     self._root = Tkinter.Tk()
     self._create_layout()
     self._log.insert(Tkinter.END, "HELLO")
-    Tkinter.mainloop()
 
   def _create_layout(self):
     self._log = Tkinter.Text(self._root, height=4, width=80)
@@ -92,13 +93,25 @@ class UI:
     self._log.pack(side=Tkinter.LEFT, fill=Tkinter.Y)
     self._scroll.config(command=self._log.yview)
     self._log.config(yscrollcommand=self._scroll.set)
+
+    # This is a hack to make the 'Text' widget readonly.
+    # Source: http://stackoverflow.com/a/34811313
+    self._log.bind("<Key>", lambda e: "break")
+
+  def _pulse(self):
+    print('Pulse..')
+    self._root.after(App.PULSE_PERIOD, self._pulse)
+
+  def run(self):
+    self._root.after(App.PULSE_PERIOD, self._pulse)
+    Tkinter.mainloop()
     
 
 
 
 def main():
-  ui = UI()
-
+  app = App()
+  app.run()
 
 
   return
