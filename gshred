@@ -91,9 +91,11 @@ class App:
     self._output = None
     self._result = None
     self._ticks = 0
+    self._refresh_devices()
 
   def _create_layout(self):
     # Configure root element.
+    self._root.wm_title('gshred')
     self._root.resizable(width=False, height=False)
     self._root.grid_columnconfigure(0, weight=1)
     self._root.grid_rowconfigure(0, weight=1)
@@ -191,7 +193,7 @@ class App:
     self._device = value
 
   def _append_log(self, line):
-    self._log.insert(tk.INSERT, line + '\n')
+    self._log.insert(tk.INSERT, line.strip() + '\n')
 
   def _shred(self):
     try:
@@ -222,11 +224,34 @@ class App:
     # Build the shredder.
     shred = Shred().iterations(1).exact(True).path(device)
     pool = multiprocessing.Pool()
+    self._append_log('Shredding..')
     self._result, self._manager, self._output = Shred.launch(pool, shred)
     self._shredding = True
+    
 
   def _refresh_devices(self):
-    pass
+    # Clear current list.
+    self._text.set('Chose device')
+    self._devices['menu'].delete(0, 'end') 
+
+    # Grab devices.
+    output = subprocess.check_output(shlex.split('lsblk -f -l -p'))
+    pattern = re.compile(r'^(/dev/\S+?)\s+?(\S+?)?$')
+
+    # Add dummy file.
+    # TODO: Remove after testing.
+    d = '/root/testfile'
+    self._devices['menu'].add_command(label=d,
+                                      command=tk._setit(self._text, d))
+
+    # Add new ones to the list.
+    for line in output.split('\n')[1:]:
+      m = pattern.search(line)
+      if not m:
+        continue
+      device, mountpoint = m.groups()
+      self._devices['menu'].add_command(label=device,
+                                        command=tk._setit(self._text, device))
     
   def run(self):
     self._root.after(App.PULSE_PERIOD, self._pulse)
