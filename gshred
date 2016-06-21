@@ -86,15 +86,25 @@ class App:
     self._log.insert(tk.END, "HELLO")
 
   def _create_layout(self):
+    # Configure root element.
+    self._root.resizable(width=False, height=False)
+    self._root.grid_columnconfigure(0, weight=1)
+    self._root.grid_rowconfigure(0, weight=1)
+
     # Create frame for the log.
     self._logframe = tk.Frame(self._root)
-    self._logframe.grid(row=0, column=0)
+    self._logframe.grid(row=1, column=0, sticky='wens')
+
+    # Create menu frame.
+    self._menuframe = tk.Frame(self._root)
+    self._menuframe.grid(row=0, column=0, sticky='wens')
+    self._menuframe.grid_columnconfigure(0, weight=1)
 
     # Create textbox for the log output. Make it scrollable.
-    self._log = tk.Text(self._logframe)
+    self._log = tk.Text(self._logframe, height=10, width=80)
     self._scroll = tk.Scrollbar(self._logframe)
     self._scroll.pack(side=tk.RIGHT, fill=tk.Y)
-    self._log.pack(side=tk.LEFT, fill=tk.Y)
+    self._log.pack(side=tk.LEFT, fill=tk.BOTH)
     self._scroll.config(command=self._log.yview)
     self._log.config(yscrollcommand=self._scroll.set)
 
@@ -103,13 +113,22 @@ class App:
     self._log.bind("<Key>", lambda e: "break")
 
     # Create dropdown list of all devices (will be populated later).
-    var = tk.StringVar(self._root, "Chose device")
-    self._devices = tk.OptionMenu(self._root, var, tuple())
-    self._devices.grid(row=0, column=1)
+    var = tk.StringVar(self._menuframe, "Chose device")
+    devs = ('hello', 'world', '/dev/sdb')
+    self._devices = tk.OptionMenu(self._menuframe, var, *devs)
+    self._devices.grid(row=0, column=0, sticky='we')
+
+    # Create shred button.
+    self._button = tk.Button(self._menuframe, text="Shred!",
+                             command=self._shred)
+    self._button.grid(row=0, column=1)
 
   def _pulse(self):
     print('Pulse..')
     self._root.after(App.PULSE_PERIOD, self._pulse)
+
+  def _shred(self):
+    print('Shred!')
 
   def _refresh_devices(self):
     pass
