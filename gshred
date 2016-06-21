@@ -2,12 +2,34 @@
 
 import re
 import os
+import sys
+import dbus
 import shlex
 import traceback
 import subprocess
 import multiprocessing
 import Tkinter as tk
 
+
+def humanize(n):
+  # Using 1KB = 1000B, not 1KB = 2**10B.
+  units = ['B', 'KB', 'MB', 'GB', 'TB']
+  if n < 10**3:
+    v = n / float(1.0)
+    u = 'B'
+  elif n < 10**6:
+    v = n / float(10**3)
+    u = 'KB'
+  elif n < 10**9:
+    v = n / float(10**6)
+    u = 'MB'
+  elif n < 10**12:
+    v = n / float(10**9)
+    u = 'GB'
+  else:
+    v = n / float(10**12)
+    u = 'TB'
+  return '%.1f %s' % (v, u)
 
 class ShredException(Exception):
   pass
@@ -109,7 +131,7 @@ class App:
     self._menuframe.grid_columnconfigure(0, weight=1)
 
     # Create textbox for the log output. Make it scrollable.
-    self._log = tk.Text(self._logframe, height=10, width=80)
+    self._log = tk.Text(self._logframe, height=10, width=120)
     self._scroll = tk.Scrollbar(self._logframe)
     self._scroll.pack(side=tk.RIGHT, fill=tk.Y)
     self._log.pack(side=tk.LEFT, fill=tk.BOTH)
@@ -224,38 +246,68 @@ class App:
     self._result, self._manager, self._output = Shred.launch(pool, shred)
     self._shredding = True
     
+  def _get_devices(self):
+    udisk = 'org.freedesktop.UDisks'
+    system_bus = dbus.SystemBus()
+
+    udisk_object = system_bus.get_object(udisk, '/org/freedesktop/UDisks')
+    udisk_interface = dbus.Interface(udisk_object, udisk)
+    
+      
+
+    # Grab information from all devices.
+    devices = list()
+    for device in udisk_interface.EnumerateDevices():
+      device_object = system_bus.get_object(udisk, device)
+      device_interface = dbus.Interface(device_object, dbus.PROPERTIES_IFACE)
+
+      # Grab properties.
+      prop = lambda x: device_interface.Get(udisk + '.Device', x)
+      mount = prop('DeviceMountPaths')
+      devices.append({
+        'file': str(prop('DeviceFile')),
+        'vendor': str(prop('DriveVendor')),
+        'mount': str(mount[0]) if len(mount) > 0 else '',
+        'size': humanize(prop('PartitionSize')),
+        'model': str(prop('DriveModel')),
+      })
+
+    return devices
 
   def _refresh_devices(self):
     # Clear current list.
+    self._get_devices()
     self._text.set('Select file/device')
     self._devices['menu'].delete(0, 'end') 
 
+    # Debugging purposes..
+    if len(sys.argv) > 1 and sys.argv[1] == '--debug':
+      d = '/root/testfile-small'
+      self._devices['menu'].add_command(label=d,
+                                        command=tk._setit(self._text, d))
+      d = '/root/testfile-big'
+      self._devices['menu'].add_command(label=d,
+                                        command=tk._setit(self._text, d))
+
     # Grab devices.
-    output = subprocess.check_output(shlex.split('lsblk -l -p'))
-    pattern = re.compile(r'^(/dev/\S+?)\s+')
-
-    # Add dummy file.
-    # TODO: Remove after testing.
-    d = '/root/testfile-small'
-    self._devices['menu'].add_command(label=d,
-                                      command=tk._setit(self._text, d))
-    d = '/root/testfile-big'
-    self._devices['menu'].add_command(label=d,
-                                      command=tk._setit(self._text, d))
-
-    # Add new ones to the list.
-    for line in output.split('\n')[1:]:
-      if App.SAFE_PATH in line:
+    devices = self._get_devices()
+    for device in devices:
+      if App.SAFE_PATH in device['mount']:
         # Do not show the live media partitions. :-)
         continue
-
-      m = pattern.search(line)
-      if not m:
+      if device['size'] == '0.0 B':
+        # Don't show special things.
         continue
 
-      device = m.group(1)
-      self._devices['menu'].add_command(label=device,
-                                        command=tk._setit(self._text, device))
+      # Build label.
+      label = '%s - %s - %s (%s)' % (device['file'], device['size'],
+                                     device['model'], device['vendor'])
+      if device['mount']:
+        label += ' - %s' % device['mount']
+
+      # Add to dropdown.
+      self._devices['menu'].add_command(label=label,
+                                        command=tk._setit(self._text, label))
     
   def run(self):
     self._root.after(App.PULSE_PERIOD, self._pulse)
