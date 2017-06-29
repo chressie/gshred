@@ -257,6 +257,12 @@ class App:
     self._shredding = True
     
   def _get_devices(self):
+    try:
+        return self._get_devices_udisks1()
+    except:
+        return self._get_devices_udisks2()
+
+  def _get_devices_udisks1(self):
     udisk = 'org.freedesktop.UDisks'
     system_bus = dbus.SystemBus()
 
@@ -279,6 +285,60 @@ class App:
         'size': humanize(prop('PartitionSize')),
         'model': str(prop('DriveModel')),
       })
+
+    return devices
+
+  def _get_devices_udisks2(self):
+
+    def mkstr(a):
+      return bytearray(a).replace(b'\x00', b'').decode('utf-8')
+
+    devices = []
+    bus = dbus.SystemBus()
+    udisks_om = bus.get_object('org.freedesktop.UDisks2', '/org/freedesktop/UDisks2')
+    om = dbus.Interface(udisks_om, 'org.freedesktop.DBus.ObjectManager')
+
+    # This map is filled with dev instances for model lookup in drive objects.
+    drive_lookup_devs = {}
+    for k, v in om.GetManagedObjects().iteritems():
+      if not str(k).startswith('/org/freedesktop/UDisks2/block_devices/'):
+        continue
+
+      dev = {
+          'file': '',
+          'vendor': '',
+          'mount': '',
+          'size': '',
+          'model': '',
+      }
+
+      blk = v.get('org.freedesktop.UDisks2.Block')
+      if not blk:
+        # Ignore if we can't get the block device.
+        continue
+
+      devices.append(dev)
+
+      dev['file'] = mkstr(blk.get('Device'))
+      drive = blk.get('Drive')
+      dev['size'] = str(blk.get('Size'))
+      if drive != '/':
+        # Store device in map, so we can fill the dev['model'] later.
+        drive_lookup_devs[str(drive)] = dev
+        dev['vendor'] = drive[len('/org/freedesktop/UDisks2/drives/'):]
+
+      fs = v.get('org.freedesktop.UDisks2.Filesystem')
+      if fs:
+        mps = []
+        for mp in fs.get('MountPoints'):
+            mps.append(mkstr(mp))
+        dev['mount'] = ' and '.join(mps)
+
+    for k, v in om.GetManagedObjects().iteritems():
+      key = str(k)
+      if drive_lookup_devs.has_key(key):
+        dev = drive_lookup_devs[key]
+        dev['model'] = str(v.get('org.freedesktop.UDisks2.Drive').get('Model'))
 
     return devices
 
